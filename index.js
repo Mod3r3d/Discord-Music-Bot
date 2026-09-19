@@ -5,24 +5,26 @@ const KazagumoSpotify = require('kazagumo-spotify');
 const { Connectors } = require('shoukaku');
 const express = require('express');
 
-// ==========================================
-// 1. HỆ THỐNG ANTI-CRASH (BẢO VỆ BOT)
-// ==========================================
+// Kiểm tra nhanh cấu hình Spotify API
+if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    console.log("⚠️ CẢNH BÁO MẠNH: Bạn chưa cấu hình SPOTIFY_CLIENT_ID hoặc SECRET trên Render!");
+    console.log("⚠️ Bot sẽ bị giới hạn ở 100 bài hát do dùng máy chủ dự phòng.");
+} else {
+    console.log("✅ Đã nhận diện Spotify API Key! Sẵn sàng tải hàng ngàn bài hát.");
+}
+
 process.on('unhandledRejection', (reason) => console.error('⚠️ [ANTI-CRASH] Promise:', reason));
 process.on('uncaughtException', (error) => console.error('⚠️ [ANTI-CRASH] System:', error));
 process.on('uncaughtExceptionMonitor', (error) => console.error('⚠️ [ANTI-CRASH] Monitor:', error));
 
 const app = express();
-app.get('/', (req, res) => res.send('Bot Node.js đang hoạt động với đầy đủ tính năng!'));
+app.get('/', (req, res) => res.send('Bot Node.js đang hoạt động!'));
 app.listen(process.env.PORT || 8080, '0.0.0.0');
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages]
 });
 
-// ==========================================
-// 2. KẾT NỐI LAVALINK & PLUGIN SPOTIFY
-// ==========================================
 const Nodes = [{
     name: 'Ajie_V4_SSL',
     url: 'lava-v4.ajieblogs.eu.org:443',
@@ -34,9 +36,9 @@ client.manager = new Kazagumo({
     defaultSearchEngine: "youtube",
     plugins: [
         new KazagumoSpotify({
-            clientId: process.env.SPOTIFY_CLIENT_ID,
-            clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-            playlistPageLimit: 10, // Lấy tối đa 10 trang (1000 bài hát) để phá vỡ giới hạn 100
+            clientId: process.env.SPOTIFY_CLIENT_ID || '',
+            clientSecret: process.env.SPOTIFY_CLIENT_SECRET || '',
+            playlistPageLimit: 10, // Lấy 10 trang = 1000 bài
             albumPageLimit: 2,
             searchLimit: 10,
             searchMarket: 'VN',
@@ -48,7 +50,6 @@ client.manager = new Kazagumo({
     }
 }, new Connectors.DiscordJS(client), Nodes);
 
-// HIỂN THỊ THÔNG BÁO KHI BẮT ĐẦU PHÁT BÀI MỚI
 client.manager.on('playerStart', (player, track) => {
     const channel = client.channels.cache.get(player.textId);
     if (channel) channel.send(`🎶 **Đang phát:** \`${track.title}\` - *${track.author}*`);
@@ -58,13 +59,11 @@ client.manager.shoukaku.on('ready', (name) => console.log(`✅ Lavalink Node: ${
 client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lỗi Lavalink:`));
 client.manager.on('playerEmpty', player => player.destroy());
 
-// ==========================================
-// 3. ĐĂNG KÝ DANH SÁCH LỆNH SLASH
-// ==========================================
+// Đổi tham số 'vitri' thành 'index' để khớp với cache của Discord
 const commands = [
-    { name: 'play', description: 'Phát nhạc (Hỗ trợ Youtube, Spotify vô hạn bài)', options: [{ name: 'query', type: 3, description: 'Tên bài hoặc URL', required: true }] },
+    { name: 'play', description: 'Phát nhạc', options: [{ name: 'query', type: 3, description: 'Tên bài hoặc URL', required: true }] },
     { name: 'skip', description: 'Bỏ qua bài hiện tại' },
-    { name: 'skipto', description: 'Nhảy đến vị trí bài hát trong hàng đợi', options: [{ name: 'vitri', type: 4, description: 'Nhập số (VD: 5)', required: true }] },
+    { name: 'skipto', description: 'Nhảy đến vị trí bài hát', options: [{ name: 'index', type: 4, description: 'Nhập số (VD: 5)', required: true }] },
     { name: 'queue', description: 'Xem danh sách chờ' },
     { name: 'pause', description: 'Tạm dừng nhạc' },
     { name: 'resume', description: 'Tiếp tục phát nhạc' },
@@ -76,15 +75,9 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('✅ Đã đồng bộ toàn bộ lệnh Slash!');
-    } catch (e) {
-        console.error('❌ Lỗi đồng bộ lệnh:', e);
-    }
+    } catch (e) {}
 });
 
-// ==========================================
-// 4. XỬ LÝ LỆNH TỪ NGƯỜI DÙNG
-// ==========================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -121,12 +114,15 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (interaction.commandName === 'skipto') {
-            const position = interaction.options.getInteger('vitri');
+            // Lấy tham số 'index' do Discord truyền về
+            const position = interaction.options.getInteger('index');
             const player = client.manager.players.get(interaction.guild.id);
-            if (!player || !player.playing) return interaction.reply('❌ Không có bài nào đang phát.');
-            if (position < 1 || position > player.queue.length) return interaction.reply(`❌ Vị trí không hợp lệ. Hàng đợi hiện có ${player.queue.length} bài.`);
             
-            // Xóa các bài từ vị trí 0 đến vị trí (position - 1)
+            if (!player || !player.playing) return interaction.reply('❌ Không có bài nào đang phát.');
+            if (!position || position < 1 || position > player.queue.length) {
+                return interaction.reply(`❌ Vị trí không hợp lệ. Hàng đợi hiện có **${player.queue.length}** bài.`);
+            }
+            
             player.queue.splice(0, position - 1);
             player.skip();
             interaction.reply(`⏭️ Đã nhảy thẳng đến bài số **${position}**!`);
@@ -144,8 +140,6 @@ client.on('interactionCreate', async interaction => {
         if (interaction.commandName === 'pause') {
             const player = client.manager.players.get(interaction.guild.id);
             if (!player || !player.playing) return interaction.reply('❌ Không có bài nào đang phát.');
-            if (player.paused) return interaction.reply('⚠️ Nhạc đã được tạm dừng từ trước rồi.');
-            
             player.pause(true);
             interaction.reply('⏸️ Đã tạm dừng nhạc!');
         }
@@ -153,8 +147,6 @@ client.on('interactionCreate', async interaction => {
         if (interaction.commandName === 'resume') {
             const player = client.manager.players.get(interaction.guild.id);
             if (!player) return interaction.reply('❌ Không có kết nối âm thanh.');
-            if (!player.paused) return interaction.reply('⚠️ Nhạc vẫn đang phát bình thường.');
-            
             player.pause(false);
             interaction.reply('▶️ Đã tiếp tục phát nhạc!');
         }
@@ -167,12 +159,7 @@ client.on('interactionCreate', async interaction => {
         }
 
     } catch (globalErr) {
-        console.error("Lỗi:", globalErr);
-        if (interaction.deferred) {
-            interaction.editReply("❌ Có lỗi hệ thống xảy ra hoặc máy chủ đang tải!");
-        } else {
-            interaction.reply({ content: "❌ Có lỗi hệ thống xảy ra!", ephemeral: true });
-        }
+        if (interaction.deferred) interaction.editReply("❌ Có lỗi hệ thống xảy ra!");
     }
 });
 
