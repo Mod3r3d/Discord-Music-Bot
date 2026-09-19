@@ -35,25 +35,13 @@ const client = new Client({
 
 // ==========================================
 // 3. CỤM MÁY CHỦ LAVALINK V4 (KẾT NỐI BẢO MẬT SSL)
-// WSS (Cổng 443 + secure: true) để xuyên qua tường lửa của public node
+// Chỉ giữ lại Node hoạt động tốt nhất để tránh spam log
 // ==========================================
 const Nodes = [
-    {
-        name: 'Oops_V4_SSL',
-        url: 'lavalink.oops.wtf:443',
-        auth: 'www.freelavalink.mp3',
-        secure: true
-    },
     {
         name: 'Ajie_V4_SSL',
         url: 'lava-v4.ajieblogs.eu.org:443',
         auth: 'https://dsc.gg/ajidevserver',
-        secure: true
-    },
-    {
-        name: 'Krypton_V4_SSL',
-        url: 'node1.krypton.ninja:443',
-        auth: 'krypton',
         secure: true
     }
 ];
@@ -67,7 +55,7 @@ client.manager = new Kazagumo({
 }, new Connectors.DiscordJS(client), Nodes);
 
 client.manager.shoukaku.on('ready', (name) => console.log(`✅ Lavalink Node: ${name} đã kết nối thành công!`));
-client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lỗi Lavalink (${name}): Có thể node đang offline.`));
+client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lỗi Lavalink (${name}): Node đang quá tải hoặc offline.`));
 client.manager.on('playerEmpty', player => player.destroy());
 
 // ==========================================
@@ -95,17 +83,16 @@ client.once('ready', async () => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.commandName === 'play') {
-        const query = interaction.options.getString('query');
-        const { channel } = interaction.member.voice;
-        
-        if (!channel) return interaction.reply({ content: '❌ Bạn cần vào kênh thoại trước!', ephemeral: true });
-        
-        // Trả lời tạm để Discord không báo lỗi timeout "đang suy nghĩ..."
-        await interaction.deferReply();
+    // Bọc toàn bộ quá trình xử lý lệnh vào Try/Catch
+    try {
+        if (interaction.commandName === 'play') {
+            const query = interaction.options.getString('query');
+            const { channel } = interaction.member.voice;
+            
+            if (!channel) return interaction.reply({ content: '❌ Bạn cần vào kênh thoại trước!', ephemeral: true });
+            
+            await interaction.deferReply();
 
-        try {
-            // Đưa việc tạo Player vào vùng an toàn, phòng khi mọi node đều sập
             let player = client.manager.players.get(interaction.guild.id);
             if (!player) {
                 player = await client.manager.createPlayer({
@@ -117,41 +104,51 @@ client.on('interactionCreate', async interaction => {
                 });
             }
 
-            // Xử lý tìm kiếm nhạc
-            const result = await client.manager.search(query, { requester: interaction.user });
-            
-            if (!result || !result.tracks || !result.tracks.length) {
-                return interaction.editReply('❌ Không tìm thấy bài hát. Bạn thử link khác xem sao!');
+            // Xử lý tìm kiếm nhạc an toàn
+            try {
+                const result = await client.manager.search(query, { requester: interaction.user });
+                
+                if (!result || !result.tracks || !result.tracks.length) {
+                    return interaction.editReply('❌ Không tìm thấy bài hát. Bạn thử link khác xem sao!');
+                }
+
+                if (result.type === 'PLAYLIST') {
+                    for (const track of result.tracks) player.queue.add(track);
+                    interaction.editReply(`🟢 Đã nạp Playlist **${result.playlistName}** gồm **${result.tracks.length}** bài hát!`);
+                } else {
+                    player.queue.add(result.tracks[0]);
+                    interaction.editReply(`🟢 Đã thêm: **${result.tracks[0].title}**`);
+                }
+
+                if (!player.playing && !player.paused) player.play();
+
+            } catch (searchErr) {
+                console.error("Lỗi khi cào nhạc:", searchErr);
+                interaction.editReply('❌ Máy chủ âm thanh Lavalink hiện đang phản hồi chậm. Vui lòng thử lại sau!');
             }
-
-            if (result.type === 'PLAYLIST') {
-                for (const track of result.tracks) player.queue.add(track);
-                interaction.editReply(`🟢 Đã nạp Playlist **${result.playlistName}** gồm **${result.tracks.length}** bài hát!`);
-            } else {
-                player.queue.add(result.tracks[0]);
-                interaction.editReply(`🟢 Đã thêm: **${result.tracks[0].title}**`);
-            }
-
-            if (!player.playing && !player.paused) player.play();
-
-        } catch (err) {
-            console.error("Lỗi khi kết nối hoặc cào nhạc:", err);
-            interaction.editReply('❌ Các máy chủ âm thanh hiện đang quá tải. Vui lòng đợi một lát rồi thử lại!');
         }
-    }
 
-    if (interaction.commandName === 'skip') {
-        const player = client.manager.players.get(interaction.guild.id);
-        if (!player || !player.playing) return interaction.reply('❌ Không có bài nào để bỏ qua.');
-        player.skip();
-        interaction.reply('⏭️ Đã bỏ qua!');
-    }
+        if (interaction.commandName === 'skip') {
+            const player = client.manager.players.get(interaction.guild.id);
+            if (!player || !player.playing) return interaction.reply('❌ Không có bài nào để bỏ qua.');
+            player.skip();
+            interaction.reply('⏭️ Đã bỏ qua!');
+        }
 
-    if (interaction.commandName === 'stop') {
-        const player = client.manager.players.get(interaction.guild.id);
-        if (!player) return interaction.reply('❌ Bot không ở trong kênh thoại.');
-        player.destroy();
-        interaction.reply('🛑 Đã dừng phát và rời kênh.');
+        if (interaction.commandName === 'stop') {
+            const player = client.manager.players.get(interaction.guild.id);
+            if (!player) return interaction.reply('❌ Bot không ở trong kênh thoại.');
+            player.destroy();
+            interaction.reply('🛑 Đã dừng phát và rời kênh.');
+        }
+
+    } catch (globalErr) {
+        console.error("Lỗi xử lý hệ thống:", globalErr);
+        if (interaction.deferred) {
+            interaction.editReply("❌ Đã xảy ra lỗi nội bộ hệ thống, nhưng bot vẫn an toàn!");
+        } else {
+            interaction.reply({ content: "❌ Đã xảy ra lỗi nội bộ hệ thống.", ephemeral: true });
+        }
     }
 });
 
