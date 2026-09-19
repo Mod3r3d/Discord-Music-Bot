@@ -34,21 +34,26 @@ const client = new Client({
 });
 
 // ==========================================
-// 3. CỤM MÁY CHỦ LAVALINK V4 CHẤT LƯỢNG CAO
+// 3. CỤM MÁY CHỦ LAVALINK V4 MỚI NHẤT
 // ==========================================
-// Kazagumo sẽ tự động chọn máy chủ nhanh nhất và chuyển đổi khi có máy sập
 const Nodes = [
     {
-        name: 'Lexnet_V4',
-        url: 'lavalink.lexnet.cc:443',
-        auth: 'lexn3tl@val!nk',
-        secure: true
+        name: 'Oops_V4',
+        url: 'lavalink.oops.wtf:2000',
+        auth: 'www.freelavalink.mp3',
+        secure: false
     },
     {
-        name: 'Nangos_V4',
-        url: 'v4.lavalink.nangos.pt:443',
-        auth: 'nangos',
-        secure: true
+        name: 'Krypton_V4',
+        url: 'node1.krypton.ninja:3128',
+        auth: 'krypton',
+        secure: false
+    },
+    {
+        name: 'Lava_Link_Default',
+        url: 'lava.link:88',
+        auth: 'youshallnotpass',
+        secure: false
     }
 ];
 
