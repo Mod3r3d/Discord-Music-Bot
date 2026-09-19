@@ -25,12 +25,20 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages]
 });
 
-const Nodes = [{
-    name: 'Ajie_V4_SSL',
-    url: 'lava-v4.ajieblogs.eu.org:443',
-    auth: 'https://dsc.gg/ajidevserver',
-    secure: true
-}];
+const Nodes = [
+    {
+        name: 'Main_Node',
+        url: 'lavalink.darrennathanael.com:443',
+        auth: 'youshallnotpass',
+        secure: true
+    },
+    {
+        name: 'Backup_Node',
+        url: 'lava-v4.ajieblogs.eu.org:443',
+        auth: 'https://dsc.gg/ajidevserver',
+        secure: true
+    }
+];
 
 client.manager = new Kazagumo({
     defaultSearchEngine: "youtube",
