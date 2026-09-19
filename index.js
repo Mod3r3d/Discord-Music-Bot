@@ -4,13 +4,27 @@ const { Kazagumo } = require('kazagumo');
 const { Connectors } = require('shoukaku');
 const express = require('express');
 
-// Khởi tạo Web Server để Render không tắt bot
-const app = express();
-app.get('/', (req, res) => res.send('Bot Node.js đang chạy tốt!'));
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🌐 Web server đang chạy trên port ${PORT}`));
+// ==========================================
+// 1. HỆ THỐNG ANTI-CRASH (BẢO VỆ BOT 100%)
+// ==========================================
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ [ANTI-CRASH] Bỏ qua lỗi Promise:', reason);
+});
+process.on('uncaughtException', (error) => {
+    console.error('⚠️ [ANTI-CRASH] Bỏ qua lỗi hệ thống:', error);
+});
+process.on('uncaughtExceptionMonitor', (error, origin) => {
+    console.error('⚠️ [ANTI-CRASH] Giám sát lỗi:', error, origin);
+});
 
-// Khởi tạo Discord Bot
+// ==========================================
+// 2. WEB SERVER & DISCORD CLIENT
+// ==========================================
+const app = express();
+app.get('/', (req, res) => res.send('Bot Node.js đang hoạt động với Anti-Crash!'));
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => console.log(`🌐 Web server port ${PORT}`));
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -19,13 +33,24 @@ const client = new Client({
     ]
 });
 
-// Kết nối tới máy chủ âm thanh Lavalink
-const Nodes = [{
-    name: 'Main_Node',
-    url: process.env.LAVALINK_URI || 'lava-v3.ajieblogs.eu.org:3132',
-    auth: process.env.LAVALINK_PASSWORD || 'https://dsc.gg/ajidevserver',
-    secure: false
-}];
+// ==========================================
+// 3. CỤM MÁY CHỦ LAVALINK V4 CHẤT LƯỢNG CAO
+// ==========================================
+// Kazagumo sẽ tự động chọn máy chủ nhanh nhất và chuyển đổi khi có máy sập
+const Nodes = [
+    {
+        name: 'Lexnet_V4',
+        url: 'lavalink.lexnet.cc:443',
+        auth: 'lexn3tl@val!nk',
+        secure: true
+    },
+    {
+        name: 'Nangos_V4',
+        url: 'v4.lavalink.nangos.pt:443',
+        auth: 'nangos',
+        secure: true
+    }
+];
 
 client.manager = new Kazagumo({
     defaultSearchEngine: "youtube",
@@ -35,17 +60,18 @@ client.manager = new Kazagumo({
     }
 }, new Connectors.DiscordJS(client), Nodes);
 
-client.manager.shoukaku.on('ready', (name) => console.log(`✅ Đã kết nối với máy chủ âm thanh: ${name}`));
-client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lỗi máy chủ âm thanh (${name}):`, error));
-
+client.manager.shoukaku.on('ready', (name) => console.log(`✅ Lavalink Node: ${name} đã kết nối thành công!`));
+client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lỗi Lavalink (${name}): Có thể node đang offline.`));
 client.manager.on('playerEmpty', player => player.destroy());
 
-// Đăng ký lệnh Slash
+// ==========================================
+// 4. LỆNH SLASH & XỬ LÝ SỰ KIỆN TỰ BẢO VỆ
+// ==========================================
 const commands = [
     {
         name: 'play',
         description: 'Phát nhạc từ YouTube, Spotify, SoundCloud...',
-        options: [{ name: 'query', type: 3, description: 'Tên bài hát hoặc link Playlist', required: true }]
+        options: [{ name: 'query', type: 3, description: 'Tên bài hát hoặc URL', required: true }]
     },
     { name: 'skip', description: 'Bỏ qua bài hiện tại' },
     { name: 'stop', description: 'Dừng nhạc và thoát' }
@@ -56,13 +82,10 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('✅ Đã đồng bộ lệnh Slash lên Discord!');
-    } catch (error) {
-        console.error('❌ Lỗi đồng bộ lệnh:', error);
-    }
+        console.log('✅ Đã đồng bộ lệnh Slash!');
+    } catch (e) { console.error('Lỗi đồng bộ lệnh:', e); }
 });
 
-// Xử lý khi người dùng gõ lệnh
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -71,31 +94,44 @@ client.on('interactionCreate', async interaction => {
         const { channel } = interaction.member.voice;
         
         if (!channel) return interaction.reply({ content: '❌ Bạn cần vào kênh thoại trước!', ephemeral: true });
+        
+        // Trả lời tạm để Discord không báo lỗi timeout "đang suy nghĩ..."
         await interaction.deferReply();
 
-        let player = client.manager.players.get(interaction.guild.id);
-        if (!player) {
-            player = await client.manager.createPlayer({
-                guildId: interaction.guild.id,
-                textId: interaction.channel.id,
-                voiceId: channel.id,
-                volume: 100,
-                deaf: true
-            });
+        try {
+            // Đưa việc tạo Player vào vùng an toàn, phòng khi mọi node đều sập
+            let player = client.manager.players.get(interaction.guild.id);
+            if (!player) {
+                player = await client.manager.createPlayer({
+                    guildId: interaction.guild.id,
+                    textId: interaction.channel.id,
+                    voiceId: channel.id,
+                    volume: 100,
+                    deaf: true
+                });
+            }
+
+            // Xử lý tìm kiếm nhạc
+            const result = await client.manager.search(query, { requester: interaction.user });
+            
+            if (!result || !result.tracks || !result.tracks.length) {
+                return interaction.editReply('❌ Không tìm thấy bài hát. Bạn thử link khác xem sao!');
+            }
+
+            if (result.type === 'PLAYLIST') {
+                for (const track of result.tracks) player.queue.add(track);
+                interaction.editReply(`🟢 Đã nạp Playlist **${result.playlistName}** gồm **${result.tracks.length}** bài hát!`);
+            } else {
+                player.queue.add(result.tracks[0]);
+                interaction.editReply(`🟢 Đã thêm: **${result.tracks[0].title}**`);
+            }
+
+            if (!player.playing && !player.paused) player.play();
+
+        } catch (err) {
+            console.error("Lỗi khi kết nối hoặc cào nhạc:", err);
+            interaction.editReply('❌ Các máy chủ âm thanh hiện đang quá tải. Vui lòng đợi một lát rồi thử lại!');
         }
-
-        const result = await client.manager.search(query, { requester: interaction.user });
-        if (!result.tracks.length) return interaction.editReply('❌ Không tìm thấy bài hát!');
-
-        if (result.type === 'PLAYLIST') {
-            for (const track of result.tracks) player.queue.add(track);
-            interaction.editReply(`🟢 Đã nạp Playlist **${result.playlistName}** gồm **${result.tracks.length}** bài hát!`);
-        } else {
-            player.queue.add(result.tracks[0]);
-            interaction.editReply(`🟢 Đã thêm: **${result.tracks[0].title}**`);
-        }
-
-        if (!player.playing && !player.paused) player.play();
     }
 
     if (interaction.commandName === 'skip') {
