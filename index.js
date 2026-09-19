@@ -34,26 +34,27 @@ const client = new Client({
 });
 
 // ==========================================
-// 3. CỤM MÁY CHỦ LAVALINK V4 MỚI NHẤT
+// 3. CỤM MÁY CHỦ LAVALINK V4 (KẾT NỐI BẢO MẬT SSL)
+// WSS (Cổng 443 + secure: true) để xuyên qua tường lửa của public node
 // ==========================================
 const Nodes = [
     {
-        name: 'Oops_V4',
-        url: 'lavalink.oops.wtf:2000',
+        name: 'Oops_V4_SSL',
+        url: 'lavalink.oops.wtf:443',
         auth: 'www.freelavalink.mp3',
-        secure: false
+        secure: true
     },
     {
-        name: 'Krypton_V4',
-        url: 'node1.krypton.ninja:3128',
+        name: 'Ajie_V4_SSL',
+        url: 'lava-v4.ajieblogs.eu.org:443',
+        auth: 'https://dsc.gg/ajidevserver',
+        secure: true
+    },
+    {
+        name: 'Krypton_V4_SSL',
+        url: 'node1.krypton.ninja:443',
         auth: 'krypton',
-        secure: false
-    },
-    {
-        name: 'Lava_Link_Default',
-        url: 'lava.link:88',
-        auth: 'youshallnotpass',
-        secure: false
+        secure: true
     }
 ];
 
