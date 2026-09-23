@@ -83,7 +83,7 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    } catch (e) {}
+    } catch (e) { }
 });
 
 client.on('interactionCreate', async interaction => {
@@ -94,7 +94,7 @@ client.on('interactionCreate', async interaction => {
             const query = interaction.options.getString('query');
             const { channel } = interaction.member.voice;
             if (!channel) return interaction.reply({ content: '❌ Bạn cần vào kênh thoại trước!', ephemeral: true });
-            
+
             await interaction.deferReply();
 
             let player = client.manager.players.get(interaction.guild.id) || await client.manager.createPlayer({
@@ -125,12 +125,12 @@ client.on('interactionCreate', async interaction => {
             // Lấy tham số 'index' do Discord truyền về
             const position = interaction.options.getInteger('index');
             const player = client.manager.players.get(interaction.guild.id);
-            
+
             if (!player || !player.playing) return interaction.reply('❌ Không có bài nào đang phát.');
             if (!position || position < 1 || position > player.queue.length) {
                 return interaction.reply(`❌ Vị trí không hợp lệ. Hàng đợi hiện có **${player.queue.length}** bài.`);
             }
-            
+
             player.queue.splice(0, position - 1);
             player.skip();
             interaction.reply(`⏭️ Đã nhảy thẳng đến bài số **${position}**!`);
@@ -139,7 +139,7 @@ client.on('interactionCreate', async interaction => {
         if (interaction.commandName === 'queue') {
             const player = client.manager.players.get(interaction.guild.id);
             if (!player || !player.queue.length) return interaction.reply('📭 Hàng đợi đang trống.');
-            
+
             const queueString = player.queue.slice(0, 10).map((track, i) => `${i + 1}. ${track.title}`).join('\n');
             const remaining = player.queue.length > 10 ? `\n*... và ${player.queue.length - 10} bài khác*` : '';
             interaction.reply(`📜 **Danh sách chờ (${player.queue.length} bài):**\n${queueString}${remaining}`);
@@ -167,7 +167,12 @@ client.on('interactionCreate', async interaction => {
         }
 
     } catch (globalErr) {
-        if (interaction.deferred) interaction.editReply("❌ Có lỗi hệ thống xảy ra!");
+        console.error("🚨 LỖI CHI TIẾT KHI CHẠY LỆNH:", globalErr); // Lôi lỗi ra ánh sáng
+        if (interaction.deferred) {
+            interaction.editReply("❌ Lỗi hệ thống! Tôi đã in chi tiết lỗi lên Render Log.");
+        } else {
+            interaction.reply({ content: "❌ Lỗi hệ thống! Hãy kiểm tra Render Log.", ephemeral: true });
+        }
     }
 });
 
