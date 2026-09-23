@@ -88,7 +88,7 @@ client.manager = new Kazagumo({
             albumPageLimit: 10,
             searchLimit: 10,
             searchMarket: 'VN',
-            lavalinkPluginTries: hasSpotifyCredentials ? 0 : 2 // Tự động load đầy đủ hàng ngàn bài khi có Spotify API Key
+            lavalinkPluginTries: 2 // Luôn dùng Lavalink LavaSrc để phân giải Spotify an toàn và mượt mà, tránh 403 Forbidden từ Spotify Web API
         })
     ],
     send: (guildId, payload) => {
