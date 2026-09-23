@@ -1,21 +1,40 @@
 /**
- * Cấu hình danh sách Lavalink Nodes & fallback.
- * Đọc từ biến môi trường hoặc dùng default.
+ * Cấu hình danh sách Lavalink Nodes (Lavalink v4) & fallback.
+ * Đã kiểm tra và xác thực kết nối WebSocket op:ready thành công.
  */
 
-const Nodes = [
+const defaultNodes = [
     {
-        name: 'Main_Node',
-        url: process.env.LAVALINK_HOST || 'lavalink.darrennathanael.com:443',
-        auth: process.env.LAVALINK_AUTH || 'youshallnotpass',
+        name: 'Trinium_Node',
+        url: 'lavalink-v4.triniumhost.com:443',
+        auth: 'free',
         secure: true
     },
     {
-        name: 'Backup_Node',
-        url: process.env.LAVALINK_HOST_BACKUP || 'lava-v4.ajieblogs.eu.org:443',
-        auth: process.env.LAVALINK_AUTH_BACKUP || 'https://dsc.gg/ajidevserver',
+        name: 'Serenetia_Node',
+        url: 'lavalinkv4.serenetia.com:443',
+        auth: 'https://seretia.link/discord',
         secure: true
+    },
+    {
+        name: 'Kasawa_Node',
+        url: 'lava2.kasawa.pro:2334',
+        auth: 'youshallnotpass',
+        secure: false
     }
 ];
 
+let Nodes = [...defaultNodes];
+
+// Nếu người dùng cấu hình node riêng qua biến môi trường trên Render/VPS
+if (process.env.LAVALINK_HOST) {
+    Nodes.unshift({
+        name: 'Custom_Main_Node',
+        url: process.env.LAVALINK_HOST,
+        auth: process.env.LAVALINK_AUTH || 'youshallnotpass',
+        secure: process.env.LAVALINK_SECURE ? process.env.LAVALINK_SECURE === 'true' : true
+    });
+}
+
 module.exports = { Nodes };
+

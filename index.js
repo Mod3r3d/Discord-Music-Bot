@@ -8,7 +8,7 @@
  */
 
 require('dotenv').config();
-const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, Events } = require('discord.js');
 const { Kazagumo } = require('kazagumo');
 const KazagumoSpotify = require('kazagumo-spotify');
 const { Connectors } = require('shoukaku');
@@ -143,7 +143,7 @@ const slashCommands = [
     previousCmd.definition
 ];
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
     console.log(`🎉 Bot đã online: ${client.user.tag}`);
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
