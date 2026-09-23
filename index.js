@@ -1,3 +1,12 @@
+/**
+ * Discord Music Bot — Entry Point
+ *
+ * Kiến trúc mới: index.js chỉ làm 3 việc:
+ * 1. Khởi động HTTP health server (cho Render)
+ * 2. Khởi tạo Discord Client + Kazagumo/Shoukaku + PlayerService
+ * 3. Đăng ký slash commands và điều hướng interaction/button/event
+ */
+
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const { Kazagumo } = require('kazagumo');
@@ -5,40 +14,64 @@ const KazagumoSpotify = require('kazagumo-spotify');
 const { Connectors } = require('shoukaku');
 const express = require('express');
 
-// Kiểm tra nhanh cấu hình Spotify API
+// --- Import modules ---
+const { Nodes } = require('./src/config/lavalink');
+const PlayerService = require('./src/services/player/PlayerService');
+const { getState } = require('./src/services/player/PlayerState');
+const QueueUI = require('./src/services/ui/QueueUI');
+const queueService = require('./src/services/queue/QueueService');
+
+// --- Import commands ---
+const playCmd = require('./src/commands/play');
+const playtopCmd = require('./src/commands/playtop');
+const playskipCmd = require('./src/commands/playskip');
+const skipCmd = require('./src/commands/skip');
+const pauseCmd = require('./src/commands/pause');
+const resumeCmd = require('./src/commands/resume');
+const stopCmd = require('./src/commands/stop');
+const queueCmd = require('./src/commands/queue');
+const repeatCmd = require('./src/commands/repeat');
+const shuffleCmd = require('./src/commands/shuffle');
+const historyCmd = require('./src/commands/history');
+const previousCmd = require('./src/commands/previous');
+
+// ============================================================
+// 1. HTTP Health Server (độc lập, khởi động ngay lập tức)
+// ============================================================
+const app = express();
+app.get('/', (_req, res) => res.send('Bot Node.js đang hoạt động!'));
+app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+app.listen(process.env.PORT || 8080, '0.0.0.0', () => {
+    console.log(`🌐 Health server listening on port ${process.env.PORT || 8080}`);
+});
+
+// ============================================================
+// 2. Anti-Crash Handlers
+// ============================================================
+process.on('unhandledRejection', (reason) => console.error('⚠️ [ANTI-CRASH] Promise:', reason));
+process.on('uncaughtException', (error) => console.error('⚠️ [ANTI-CRASH] System:', error));
+process.on('uncaughtExceptionMonitor', (error) => console.error('⚠️ [ANTI-CRASH] Monitor:', error));
+
+// ============================================================
+// 3. Kiểm tra cấu hình Spotify
+// ============================================================
 if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    console.log("⚠️ CẢNH BÁO MẠNH: Bạn chưa cấu hình SPOTIFY_CLIENT_ID hoặc SECRET trên Render!");
+    console.log("⚠️ CẢNH BÁO: Chưa cấu hình SPOTIFY_CLIENT_ID hoặc SECRET!");
     console.log("⚠️ Bot sẽ bị giới hạn ở 100 bài hát do dùng máy chủ dự phòng.");
 } else {
     console.log("✅ Đã nhận diện Spotify API Key! Sẵn sàng tải hàng ngàn bài hát.");
 }
 
-process.on('unhandledRejection', (reason) => console.error('⚠️ [ANTI-CRASH] Promise:', reason));
-process.on('uncaughtException', (error) => console.error('⚠️ [ANTI-CRASH] System:', error));
-process.on('uncaughtExceptionMonitor', (error) => console.error('⚠️ [ANTI-CRASH] Monitor:', error));
-
-const app = express();
-app.get('/', (req, res) => res.send('Bot Node.js đang hoạt động!'));
-app.listen(process.env.PORT || 8080, '0.0.0.0');
-
+// ============================================================
+// 4. Discord Client + Kazagumo
+// ============================================================
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessages
+    ]
 });
-
-const Nodes = [
-    {
-        name: 'Main_Node',
-        url: 'lavalink.darrennathanael.com:443',
-        auth: 'youshallnotpass',
-        secure: true
-    },
-    {
-        name: 'Backup_Node',
-        url: 'lava-v4.ajieblogs.eu.org:443',
-        auth: 'https://dsc.gg/ajidevserver',
-        secure: true
-    }
-];
 
 client.manager = new Kazagumo({
     defaultSearchEngine: "youtube",
@@ -46,7 +79,7 @@ client.manager = new Kazagumo({
         new KazagumoSpotify({
             clientId: process.env.SPOTIFY_CLIENT_ID || '',
             clientSecret: process.env.SPOTIFY_CLIENT_SECRET || '',
-            playlistPageLimit: 10, // Lấy 10 trang = 1000 bài
+            playlistPageLimit: 10,
             albumPageLimit: 2,
             searchLimit: 10,
             searchMarket: 'VN',
@@ -58,122 +91,215 @@ client.manager = new Kazagumo({
     }
 }, new Connectors.DiscordJS(client), Nodes);
 
-client.manager.on('playerStart', (player, track) => {
-    const channel = client.channels.cache.get(player.textId);
-    if (channel) channel.send(`🎶 **Đang phát:** \`${track.title}\` - *${track.author}*`);
+// --- Khởi tạo PlayerService ---
+const playerService = new PlayerService(client, client.manager);
+
+// ============================================================
+// 5. Kazagumo / Shoukaku Events
+// ============================================================
+client.manager.shoukaku.on('ready', (name) => {
+    console.log(`✅ Lavalink Node: ${name} đã kết nối!`);
+});
+client.manager.shoukaku.on('error', (name, error) => {
+    console.error(`❌ Lỗi Lavalink Node ${name}:`, error?.message || error);
 });
 
-client.manager.shoukaku.on('ready', (name) => console.log(`✅ Lavalink Node: ${name} đã kết nối!`));
-client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lỗi Lavalink:`));
-client.manager.on('playerEmpty', player => player.destroy());
+// Bài hát bắt đầu phát → gửi Now Playing embed
+client.manager.on('playerStart', (player, track) => {
+    playerService.onTrackStart(player, track);
+});
 
-// Đổi tham số 'vitri' thành 'index' để khớp với cache của Discord
-const commands = [
-    { name: 'play', description: 'Phát nhạc', options: [{ name: 'query', type: 3, description: 'Tên bài hoặc URL', required: true }] },
-    { name: 'skip', description: 'Bỏ qua bài hiện tại' },
-    { name: 'skipto', description: 'Nhảy đến vị trí bài hát', options: [{ name: 'index', type: 4, description: 'Nhập số (VD: 5)', required: true }] },
-    { name: 'queue', description: 'Xem danh sách chờ' },
-    { name: 'pause', description: 'Tạm dừng nhạc' },
-    { name: 'resume', description: 'Tiếp tục phát nhạc' },
-    { name: 'stop', description: 'Dừng nhạc và thoát' }
+// Bài hát kết thúc → lưu history, xử lý repeat
+client.manager.on('playerEnd', (player) => {
+    const track = player.queue.current;
+    playerService.onTrackEnd(player, track);
+});
+
+// Hàng đợi hết bài → hủy player
+client.manager.on('playerEmpty', (player) => {
+    playerService.onPlayerEmpty(player);
+});
+
+// Player bị hủy → dọn state
+client.manager.on('playerDestroy', (player) => {
+    playerService.onPlayerDestroy(player.guildId);
+});
+
+// ============================================================
+// 6. Đăng ký Slash Commands
+// ============================================================
+const slashCommands = [
+    playCmd.definition,
+    playtopCmd.definition,
+    playskipCmd.definition,
+    ...skipCmd.definitions,  // skip có 2 definitions: skip + skipto
+    pauseCmd.definition,
+    resumeCmd.definition,
+    stopCmd.definition,
+    queueCmd.definition,
+    repeatCmd.definition,
+    shuffleCmd.definition,
+    historyCmd.definition,
+    previousCmd.definition
 ];
 
 client.once('ready', async () => {
     console.log(`🎉 Bot đã online: ${client.user.tag}`);
+
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
-        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    } catch (e) { }
-});
-
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-
-    try {
-        if (interaction.commandName === 'play') {
-            const query = interaction.options.getString('query');
-            const { channel } = interaction.member.voice;
-            if (!channel) return interaction.reply({ content: '❌ Bạn cần vào kênh thoại trước!', ephemeral: true });
-
-            await interaction.deferReply();
-
-            let player = client.manager.players.get(interaction.guild.id) || await client.manager.createPlayer({
-                guildId: interaction.guild.id, textId: interaction.channel.id, voiceId: channel.id, volume: 100, deaf: true
-            });
-
-            const result = await client.manager.search(query, { requester: interaction.user });
-            if (!result || !result.tracks.length) return interaction.editReply('❌ Không tìm thấy bài hát!');
-
-            if (result.type === 'PLAYLIST') {
-                for (const track of result.tracks) player.queue.add(track);
-                interaction.editReply(`🟢 Đã nạp Playlist **${result.playlistName}** gồm **${result.tracks.length}** bài hát!`);
-            } else {
-                player.queue.add(result.tracks[0]);
-                interaction.editReply(`🟢 Đã thêm: **${result.tracks[0].title}**`);
-            }
-            if (!player.playing && !player.paused) player.play();
-        }
-
-        if (interaction.commandName === 'skip') {
-            const player = client.manager.players.get(interaction.guild.id);
-            if (!player || !player.playing) return interaction.reply('❌ Không có bài nào để bỏ qua.');
-            player.skip();
-            interaction.reply('⏭️ Đã bỏ qua bài hiện tại!');
-        }
-
-        if (interaction.commandName === 'skipto') {
-            // Lấy tham số 'index' do Discord truyền về
-            const position = interaction.options.getInteger('index');
-            const player = client.manager.players.get(interaction.guild.id);
-
-            if (!player || !player.playing) return interaction.reply('❌ Không có bài nào đang phát.');
-            if (!position || position < 1 || position > player.queue.length) {
-                return interaction.reply(`❌ Vị trí không hợp lệ. Hàng đợi hiện có **${player.queue.length}** bài.`);
-            }
-
-            player.queue.splice(0, position - 1);
-            player.skip();
-            interaction.reply(`⏭️ Đã nhảy thẳng đến bài số **${position}**!`);
-        }
-
-        if (interaction.commandName === 'queue') {
-            const player = client.manager.players.get(interaction.guild.id);
-            if (!player || !player.queue.length) return interaction.reply('📭 Hàng đợi đang trống.');
-
-            const queueString = player.queue.slice(0, 10).map((track, i) => `${i + 1}. ${track.title}`).join('\n');
-            const remaining = player.queue.length > 10 ? `\n*... và ${player.queue.length - 10} bài khác*` : '';
-            interaction.reply(`📜 **Danh sách chờ (${player.queue.length} bài):**\n${queueString}${remaining}`);
-        }
-
-        if (interaction.commandName === 'pause') {
-            const player = client.manager.players.get(interaction.guild.id);
-            if (!player || !player.playing) return interaction.reply('❌ Không có bài nào đang phát.');
-            player.pause(true);
-            interaction.reply('⏸️ Đã tạm dừng nhạc!');
-        }
-
-        if (interaction.commandName === 'resume') {
-            const player = client.manager.players.get(interaction.guild.id);
-            if (!player) return interaction.reply('❌ Không có kết nối âm thanh.');
-            player.pause(false);
-            interaction.reply('▶️ Đã tiếp tục phát nhạc!');
-        }
-
-        if (interaction.commandName === 'stop') {
-            const player = client.manager.players.get(interaction.guild.id);
-            if (!player) return interaction.reply('❌ Bot không ở trong kênh thoại.');
-            player.destroy();
-            interaction.reply('🛑 Đã dừng nhạc và xóa toàn bộ hàng đợi.');
-        }
-
-    } catch (globalErr) {
-        console.error("🚨 LỖI CHI TIẾT KHI CHẠY LỆNH:", globalErr); // Lôi lỗi ra ánh sáng
-        if (interaction.deferred) {
-            interaction.editReply("❌ Lỗi hệ thống! Tôi đã in chi tiết lỗi lên Render Log.");
-        } else {
-            interaction.reply({ content: "❌ Lỗi hệ thống! Hãy kiểm tra Render Log.", ephemeral: true });
-        }
+        console.log('🔄 Đang đăng ký slash commands...');
+        await rest.put(Routes.applicationCommands(client.user.id), { body: slashCommands });
+        console.log(`✅ Đã đăng ký ${slashCommands.length} slash commands!`);
+    } catch (err) {
+        console.error('❌ Lỗi đăng ký slash commands:', err);
     }
 });
 
+// ============================================================
+// 7. Interaction Router (Commands + Buttons)
+// ============================================================
+client.on('interactionCreate', async (interaction) => {
+    try {
+        // --- Slash Commands ---
+        if (interaction.isChatInputCommand()) {
+            switch (interaction.commandName) {
+                case 'play':
+                    return await playCmd.execute(interaction, playerService);
+                case 'playtop':
+                    return await playtopCmd.execute(interaction, playerService);
+                case 'playskip':
+                    return await playskipCmd.execute(interaction, playerService);
+                case 'skip':
+                    return await skipCmd.executeSkip(interaction, playerService);
+                case 'skipto':
+                    return await skipCmd.executeSkipTo(interaction, playerService);
+                case 'pause':
+                    return await pauseCmd.execute(interaction, playerService);
+                case 'resume':
+                    return await resumeCmd.execute(interaction, playerService);
+                case 'stop':
+                    return await stopCmd.execute(interaction, playerService);
+                case 'queue':
+                    return await queueCmd.execute(interaction, playerService);
+                case 'repeat':
+                    return await repeatCmd.execute(interaction, playerService);
+                case 'shuffle':
+                    return await shuffleCmd.execute(interaction, playerService);
+                case 'history':
+                    return await historyCmd.execute(interaction, playerService);
+                case 'previous':
+                    return await previousCmd.execute(interaction, playerService);
+            }
+        }
+
+        // --- Button Interactions (Now Playing & Queue pagination) ---
+        if (interaction.isButton()) {
+            const customId = interaction.customId;
+
+            // Now Playing buttons
+            if (customId.startsWith('np_')) {
+                const player = client.manager.players.get(interaction.guild.id);
+                if (!player) {
+                    return interaction.reply({ content: '❌ Không có kết nối âm thanh.', ephemeral: true });
+                }
+
+                // Kiểm tra user ở cùng voice channel
+                const memberVoice = interaction.member.voice?.channel;
+                if (!memberVoice || memberVoice.id !== player.voiceId) {
+                    return interaction.reply({ content: '❌ Bạn cần ở cùng kênh thoại với bot!', ephemeral: true });
+                }
+
+                await interaction.deferUpdate();
+
+                switch (customId) {
+                    case 'np_previous': {
+                        const result = playerService.previous(player);
+                        if (!result.ok) {
+                            await interaction.followUp({ content: result.error, ephemeral: true });
+                        }
+                        break;
+                    }
+                    case 'np_pause_resume': {
+                        if (player.paused) {
+                            playerService.resume(player);
+                        } else {
+                            playerService.pause(player);
+                        }
+                        // Update embed ngay lập tức
+                        const state = getState(interaction.guild.id);
+                        const NowPlayingUI = require('./src/services/ui/NowPlayingUI');
+                        const updated = NowPlayingUI.create(player, player.queue.current, state);
+                        await interaction.editReply({ embeds: [updated.embed], components: updated.components });
+                        break;
+                    }
+                    case 'np_skip': {
+                        playerService.skip(player);
+                        break;
+                    }
+                    case 'np_repeat': {
+                        const state = getState(interaction.guild.id);
+                        state.cycleRepeatMode();
+                        const NowPlayingUI = require('./src/services/ui/NowPlayingUI');
+                        const updated = NowPlayingUI.create(player, player.queue.current, state);
+                        await interaction.editReply({ embeds: [updated.embed], components: updated.components });
+                        break;
+                    }
+                    case 'np_shuffle': {
+                        if (player.queue.length > 1) {
+                            queueService.shuffle(player);
+                            await interaction.followUp({ content: `🔀 Đã xáo trộn **${player.queue.length}** bài!`, ephemeral: true });
+                        } else {
+                            await interaction.followUp({ content: '❌ Cần ít nhất 2 bài để xáo trộn.', ephemeral: true });
+                        }
+                        break;
+                    }
+                    case 'np_queue': {
+                        const { embed, components } = QueueUI.create(player, 1);
+                        await interaction.followUp({ embeds: [embed], components, ephemeral: true });
+                        break;
+                    }
+                    case 'np_stop': {
+                        playerService.stop(player);
+                        await interaction.editReply({
+                            embeds: [],
+                            components: [],
+                            content: '🛑 Đã dừng nhạc và xóa toàn bộ hàng đợi.'
+                        });
+                        break;
+                    }
+                }
+                return;
+            }
+
+            // Queue pagination buttons
+            if (customId.startsWith('queue_') && customId !== 'queue_page_indicator') {
+                const player = client.manager.players.get(interaction.guild.id);
+                if (!player) {
+                    return interaction.reply({ content: '❌ Không có kết nối âm thanh.', ephemeral: true });
+                }
+
+                await interaction.deferUpdate();
+                const targetPage = QueueUI.parsePageFromButton(customId);
+                const { embed, components } = QueueUI.create(player, targetPage);
+                await interaction.editReply({ embeds: [embed], components });
+                return;
+            }
+        }
+
+    } catch (globalErr) {
+        console.error("🚨 LỖI CHI TIẾT KHI CHẠY LỆNH:", globalErr);
+        try {
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply("❌ Lỗi hệ thống! Tôi đã ghi chi tiết lỗi vào log.").catch(() => {});
+            } else {
+                await interaction.reply({ content: "❌ Lỗi hệ thống! Hãy kiểm tra log.", ephemeral: true }).catch(() => {});
+            }
+        } catch { /* Bỏ qua lỗi khi cố phản hồi interaction đã hết hạn */ }
+    }
+});
+
+// ============================================================
+// 8. Đăng nhập Discord
+// ============================================================
 client.login(process.env.DISCORD_TOKEN);
