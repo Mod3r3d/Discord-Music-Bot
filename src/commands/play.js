@@ -49,13 +49,13 @@ async function execute(interaction, playerService) {
 
         // Xử lý kết quả
         if (result.type === 'PLAYLIST') {
-            playerService.enqueueMultipleAndPlay(player, result.tracks);
+            await playerService.enqueueMultipleAndPlay(player, result.tracks);
             await interaction.editReply(
                 `🟢 Đã nạp Playlist **${result.playlistName || 'Danh sách phát'}** gồm **${result.tracks.length}** bài hát!`
             );
         } else {
             const track = result.tracks[0];
-            playerService.enqueueAndPlay(player, track);
+            await playerService.enqueueAndPlay(player, track);
             await interaction.editReply(`🟢 Đã thêm: **${track.title}**`);
         }
     } catch (err) {

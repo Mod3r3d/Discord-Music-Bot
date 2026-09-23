@@ -35,6 +35,7 @@ const shuffleCmd = require('./src/commands/shuffle');
 const historyCmd = require('./src/commands/history');
 const previousCmd = require('./src/commands/previous');
 const volumeCmd = require('./src/commands/volume');
+const nowplayingCmd = require('./src/commands/nowplaying');
 
 // ============================================================
 // 1. HTTP Health Server (độc lập, khởi động ngay lập tức)
@@ -158,7 +159,8 @@ const slashCommands = [
     shuffleCmd.definition,
     historyCmd.definition,
     previousCmd.definition,
-    volumeCmd.definition
+    volumeCmd.definition,
+    ...nowplayingCmd.definitions
 ];
 
 client.once(Events.ClientReady, async () => {
@@ -210,6 +212,9 @@ client.on('interactionCreate', async (interaction) => {
                     return await previousCmd.execute(interaction, playerService);
                 case 'volume':
                     return await volumeCmd.execute(interaction, playerService);
+                case 'nowplaying':
+                case 'np':
+                    return await nowplayingCmd.execute(interaction, playerService);
             }
         }
 

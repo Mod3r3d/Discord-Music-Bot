@@ -16,7 +16,7 @@ async function execute(interaction, playerService) {
     const voiceCheck = checkSameVoiceChannel(interaction.member, playerCheck.player);
     if (!voiceCheck.ok) return interaction.reply({ content: voiceCheck.error, ephemeral: true });
 
-    playerService.stop(playerCheck.player);
+    await playerService.stop(playerCheck.player);
     await interaction.reply('🛑 Đã dừng nhạc và xóa toàn bộ hàng đợi.');
 }
 

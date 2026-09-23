@@ -26,6 +26,13 @@ class PlayerService {
      */
     async getOrCreatePlayer({ guildId, textId, voiceId }) {
         let player = this.manager.players.get(guildId);
+        // Nếu player đã bị destroy hoặc mất kết nối voice, dọn dẹp để tạo mới
+        if (player && (player.state === 'DESTROYED' || player.state === 'DESTROYING' || !player.voiceId)) {
+            try { await player.destroy(); } catch (_) {}
+            this.manager.players.delete(guildId);
+            player = null;
+        }
+
         if (!player) {
             player = await this.manager.createPlayer({
                 guildId,
@@ -34,6 +41,9 @@ class PlayerService {
                 volume: 130, // Mặc định 130% để to và rõ hơn
                 deaf: true
             });
+        } else {
+            if (textId && player.textId !== textId) player.setTextChannel(textId);
+            if (voiceId && player.voiceId !== voiceId) player.setVoiceChannel(voiceId);
         }
         return player;
     }
@@ -95,10 +105,14 @@ class PlayerService {
      * @param {object} player - Kazagumo player
      * @param {object} track - Kazagumo track
      */
-    enqueueAndPlay(player, track) {
+    async enqueueAndPlay(player, track) {
         queueService.add(player, track);
-        if (!player.playing && !player.paused) {
-            player.play();
+        if (!player.queue.current) {
+            try {
+                await player.play();
+            } catch (err) {
+                console.error('[PlayerService] Lỗi khi gọi player.play():', err);
+            }
         }
     }
 
@@ -107,10 +121,14 @@ class PlayerService {
      * @param {object} player - Kazagumo player
      * @param {object[]} tracks - Mảng Kazagumo tracks
      */
-    enqueueMultipleAndPlay(player, tracks) {
+    async enqueueMultipleAndPlay(player, tracks) {
         queueService.add(player, tracks);
-        if (!player.playing && !player.paused) {
-            player.play();
+        if (!player.queue.current) {
+            try {
+                await player.play();
+            } catch (err) {
+                console.error('[PlayerService] Lỗi khi gọi player.play() (playlist):', err);
+            }
         }
     }
 
@@ -199,15 +217,16 @@ class PlayerService {
         player.pause(false);
     }
 
-    /**
-     * Dừng nhạc, xóa queue, hủy player.
-     * @param {object} player
-     */
-    stop(player) {
+    async stop(player) {
         const state = getState(player.guildId);
         state.incrementGeneration();
         state.clearNowPlaying();
-        player.destroy();
+        player.queue.length = 0;
+        player.queue.current = null;
+        try {
+            await player.destroy();
+        } catch (_) {}
+        this.manager.players.delete(player.guildId);
     }
 
     /**
