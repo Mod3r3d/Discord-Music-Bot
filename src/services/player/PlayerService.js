@@ -27,7 +27,8 @@ class PlayerService {
     async getOrCreatePlayer({ guildId, textId, voiceId }) {
         let player = this.manager.players.get(guildId);
         // Nếu player đã bị destroy hoặc mất kết nối voice, dọn dẹp để tạo mới
-        if (player && (player.state === 'DESTROYED' || player.state === 'DESTROYING' || !player.voiceId)) {
+        // Trong Shoukaku / Kazagumo: State = CONNECTING: 0, CONNECTED: 1, DISCONNECTING: 2, DISCONNECTED: 3
+        if (player && ((player.state !== 1 && player.state !== 0) || !player.voiceId)) {
             try { await player.destroy(); } catch (_) {}
             this.manager.players.delete(guildId);
             player = null;
@@ -113,6 +114,7 @@ class PlayerService {
                 await player.play();
             } catch (err) {
                 console.error('[PlayerService] Lỗi khi gọi player.play():', err);
+                throw err;
             }
         }
     }
@@ -130,6 +132,7 @@ class PlayerService {
                 await player.play();
             } catch (err) {
                 console.error('[PlayerService] Lỗi khi gọi player.play() (playlist):', err);
+                throw err;
             }
         }
     }

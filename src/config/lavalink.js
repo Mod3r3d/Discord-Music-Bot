@@ -9,12 +9,6 @@ const defaultNodes = [
         url: 'lava2.kasawa.pro:2334',
         auth: 'youshallnotpass',
         secure: false
-    },
-    {
-        name: 'Serenetia_Node',
-        url: 'lavalinkv4.serenetia.com:443',
-        auth: 'https://seretia.link/discord',
-        secure: true
     }
 ];
 
