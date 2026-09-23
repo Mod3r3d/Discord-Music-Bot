@@ -1,0 +1,9 @@
+.git
+.gitignore
+*.exe
+__pycache__
+*.pyc
+.env
+README*
+*.md
+tests/

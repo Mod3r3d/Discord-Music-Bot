@@ -1,0 +1,17 @@
+{
+  "name": "discord-music-bot-nodejs",
+  "version": "1.0.0",
+  "description": "Flavibot Architecture Clone",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "kazagumo": "^3.0.0",
+    "kazagumo-spotify": "latest",
+    "shoukaku": "^4.0.1"
+  }
+}
