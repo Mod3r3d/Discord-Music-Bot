@@ -48,8 +48,16 @@ class PlayerService {
         console.log(`🔍 [Search] Bắt đầu tìm kiếm: "${query}"`);
         let result = null;
 
+        const withTimeout = (promise, ms, desc) => {
+            let timer;
+            const timeout = new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error(`Quá thời gian (${ms / 1000}s): ${desc}`)), ms);
+            });
+            return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+        };
+
         try {
-            result = await this.manager.search(query, { requester });
+            result = await withTimeout(this.manager.search(query, { requester }), 20000, 'Kazagumo search');
         } catch (err) {
             console.error(`⚠️ [Search] Kazagumo search error:`, err.message);
         }
@@ -60,7 +68,7 @@ class PlayerService {
             console.log(`⚠️ [Search] Không có kết quả từ plugin, thử fallback qua Lavalink...`);
             try {
                 if (typeof this.manager._search === 'function') {
-                    result = await this.manager._search(query, { requester });
+                    result = await withTimeout(this.manager._search(query, { requester }), 15000, 'Fallback _search');
                 }
             } catch (fallbackErr) {
                 console.error(`❌ [Search] Fallback _search error:`, fallbackErr.message);
@@ -72,7 +80,7 @@ class PlayerService {
         if ((!result || !result.tracks || result.tracks.length === 0) && !/^https?:\/\//.test(query)) {
             console.log(`⚠️ [Search] Thử tìm kiếm với tiền tố ytsearch: "${query}"...`);
             try {
-                result = await this.manager.search(`ytsearch:${query}`, { requester });
+                result = await withTimeout(this.manager.search(`ytsearch:${query}`, { requester }), 15000, 'ytsearch');
             } catch (ytErr) {
                 console.error(`❌ [Search] YouTube prefix error:`, ytErr.message);
             }
