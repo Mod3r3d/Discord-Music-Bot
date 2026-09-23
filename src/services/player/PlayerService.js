@@ -107,7 +107,8 @@ class PlayerService {
      */
     async enqueueAndPlay(player, track) {
         queueService.add(player, track);
-        if (!player.queue.current) {
+        console.log(`[PlayerService] enqueueAndPlay: playing=${player.playing}, current=${player.queue.current?.title}`);
+        if (!player.playing) {
             try {
                 await player.play();
             } catch (err) {
@@ -123,7 +124,8 @@ class PlayerService {
      */
     async enqueueMultipleAndPlay(player, tracks) {
         queueService.add(player, tracks);
-        if (!player.queue.current) {
+        console.log(`[PlayerService] enqueueMultipleAndPlay: nạp ${tracks.length} bài. playing=${player.playing}, current=${player.queue.current?.title}`);
+        if (!player.playing) {
             try {
                 await player.play();
             } catch (err) {
@@ -262,11 +264,15 @@ class PlayerService {
      * @param {object} track - Track đang phát
      */
     async onTrackStart(player, track) {
+        console.log(`🎵 [PlayerService] onTrackStart: "${track?.title}" trên guild ${player.guildId}, textId=${player.textId}`);
         const state = getState(player.guildId);
         state.clearNowPlaying();
 
         const channel = this.client.channels.cache.get(player.textId);
-        if (!channel) return;
+        if (!channel) {
+            console.error(`❌ [PlayerService] Không tìm thấy text channel ${player.textId} để gửi Now Playing!`);
+            return;
+        }
 
         try {
             const { embed, components } = NowPlayingUI.create(player, track, state);
