@@ -55,9 +55,13 @@ process.on('uncaughtExceptionMonitor', (error) => console.error('⚠️ [ANTI-CR
 // ============================================================
 // 3. Kiểm tra cấu hình Spotify
 // ============================================================
-if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+const spotifyClientId = process.env.SPOTIFY_CLIENT_ID ? process.env.SPOTIFY_CLIENT_ID.trim().replace(/^["']|["']$/g, '') : '';
+const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET ? process.env.SPOTIFY_CLIENT_SECRET.trim().replace(/^["']|["']$/g, '') : '';
+const hasSpotifyCredentials = Boolean(spotifyClientId && spotifyClientSecret);
+
+if (!hasSpotifyCredentials) {
     console.log("⚠️ CẢNH BÁO: Chưa cấu hình SPOTIFY_CLIENT_ID hoặc SECRET!");
-    console.log("⚠️ Bot sẽ bị giới hạn ở 100 bài hát do dùng máy chủ dự phòng.");
+    console.log("⚠️ Bot sẽ dùng máy chủ Lavalink dự phòng để phát nhạc.");
 } else {
     console.log("✅ Đã nhận diện Spotify API Key! Sẵn sàng tải hàng ngàn bài hát.");
 }
@@ -73,20 +77,17 @@ const client = new Client({
     ]
 });
 
-const hasSpotifyCredentials = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
-
 client.manager = new Kazagumo({
     defaultSearchEngine: "youtube",
     plugins: [
         new KazagumoSpotify({
-            clientId: process.env.SPOTIFY_CLIENT_ID || '',
-            clientSecret: process.env.SPOTIFY_CLIENT_SECRET || '',
-            playlistPageLimit: 50, // Hỗ trợ tới 5.000 bài thay vì bị chặn ở 100 bài
+            clientId: spotifyClientId,
+            clientSecret: spotifyClientSecret,
+            playlistPageLimit: 50,
             albumPageLimit: 10,
             searchLimit: 10,
             searchMarket: 'VN',
-            // Nếu có API Key, ưu tiên fetch trực tiếp qua Spotify API để không bị LavaSrc giới hạn 100 bài
-            lavalinkPluginTries: hasSpotifyCredentials ? 0 : 2
+            lavalinkPluginTries: 2 // Luôn ưu tiên Lavalink phân giải trước để không bị lỗi với playlist riêng tư/token
         })
     ],
     send: (guildId, payload) => {

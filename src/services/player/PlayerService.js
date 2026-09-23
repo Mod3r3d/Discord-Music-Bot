@@ -39,13 +39,47 @@ class PlayerService {
     }
 
     /**
-     * Tìm kiếm bài hát.
+     * Tìm kiếm bài hát kèm cơ chế Fallback thông minh.
      * @param {string} query - Từ khóa hoặc URL
      * @param {object} requester - Discord user
      * @returns {Promise<object>} Kết quả tìm kiếm Kazagumo
      */
     async search(query, requester) {
-        return this.manager.search(query, { requester });
+        console.log(`🔍 [Search] Bắt đầu tìm kiếm: "${query}"`);
+        let result = null;
+
+        try {
+            result = await this.manager.search(query, { requester });
+        } catch (err) {
+            console.error(`⚠️ [Search] Kazagumo search error:`, err.message);
+        }
+
+        // Fallback 1: Nếu plugin (như Spotify) trả về rỗng hoặc lỗi token/private playlist,
+        // thử tìm kiếm trực tiếp qua Lavalink Node (Kazagumo._search)
+        if (!result || !result.tracks || result.tracks.length === 0) {
+            console.log(`⚠️ [Search] Không có kết quả từ plugin, thử fallback qua Lavalink...`);
+            try {
+                if (typeof this.manager._search === 'function') {
+                    result = await this.manager._search(query, { requester });
+                }
+            } catch (fallbackErr) {
+                console.error(`❌ [Search] Fallback _search error:`, fallbackErr.message);
+            }
+        }
+
+        // Fallback 2: Nếu là từ khóa tìm kiếm (không phải URL) và vẫn chưa thấy bài nào,
+        // thử ép kiểu tìm kiếm YouTube trực tiếp
+        if ((!result || !result.tracks || result.tracks.length === 0) && !/^https?:\/\//.test(query)) {
+            console.log(`⚠️ [Search] Thử tìm kiếm với tiền tố ytsearch: "${query}"...`);
+            try {
+                result = await this.manager.search(`ytsearch:${query}`, { requester });
+            } catch (ytErr) {
+                console.error(`❌ [Search] YouTube prefix error:`, ytErr.message);
+            }
+        }
+
+        console.log(`✅ [Search] Kết quả hoàn tất: Type=${result?.type || 'NONE'}, Số tracks=${result?.tracks?.length || 0}`);
+        return result;
     }
 
     /**
