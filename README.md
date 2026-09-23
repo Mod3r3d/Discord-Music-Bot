@@ -144,4 +144,4 @@ node index.js
 ---
 
 ## 🛡️ Bản quyền & Giấy phép
-Dự án được phát triển và tối ưu cho cộng đồng sử dụng theo giấy phép [MIT](LICENSE).
+Dự án được phát triển và tối ưu cho cộng đồng sử dụng.
