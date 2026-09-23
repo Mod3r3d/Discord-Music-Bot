@@ -21,12 +21,6 @@ const defaultNodes = [
         url: 'lavalink.triniumhost.com:4333',
         auth: 'free',
         secure: false
-    },
-    {
-        name: 'Trinium_SSL_Node',
-        url: 'lavalink-v4.triniumhost.com:443',
-        auth: 'free',
-        secure: true
     }
 ];
 
