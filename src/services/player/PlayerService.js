@@ -217,14 +217,21 @@ class PlayerService {
             // Cập nhật thanh tiến trình mỗi 10 giây
             state.progressInterval = setInterval(async () => {
                 try {
-                    if (!player.playing && !player.paused) {
+                    const currentTrack = player.queue.current || track;
+                    if (!currentTrack || !state.nowPlayingMessageId) {
                         state.clearNowPlaying();
                         return;
                     }
-                    const updated = NowPlayingUI.create(player, player.queue.current, state);
-                    await msg.edit({ embeds: [updated.embed], components: updated.components }).catch(() => {});
-                } catch {
-                    state.clearNowPlaying();
+                    if (player.paused) return; // Đang tạm dừng thì giữ nguyên UI
+
+                    const updated = NowPlayingUI.create(player, currentTrack, state);
+                    await msg.edit({ embeds: [updated.embed], components: updated.components }).catch(err => {
+                        if (err && err.code === 10008) { // Tin nhắn đã bị người dùng xóa trên Discord
+                            state.clearNowPlaying();
+                        }
+                    });
+                } catch (err) {
+                    console.error('[PlayerService] Lỗi cập nhật tiến trình Now Playing:', err.message);
                 }
             }, 10_000);
 

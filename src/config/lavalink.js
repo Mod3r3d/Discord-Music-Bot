@@ -5,22 +5,28 @@
 
 const defaultNodes = [
     {
-        name: 'Trinium_Node',
-        url: 'lavalink-v4.triniumhost.com:443',
-        auth: 'free',
-        secure: true
-    },
-    {
-        name: 'Serenetia_Node',
-        url: 'lavalinkv4.serenetia.com:443',
-        auth: 'https://seretia.link/discord',
-        secure: true
-    },
-    {
         name: 'Kasawa_Node',
         url: 'lava2.kasawa.pro:2334',
         auth: 'youshallnotpass',
         secure: false
+    },
+    {
+        name: 'Trinium_2333_Node',
+        url: 'lavalink.triniumhost.com:2333',
+        auth: 'kirito',
+        secure: false
+    },
+    {
+        name: 'Trinium_4333_Node',
+        url: 'lavalink.triniumhost.com:4333',
+        auth: 'free',
+        secure: false
+    },
+    {
+        name: 'Trinium_SSL_Node',
+        url: 'lavalink-v4.triniumhost.com:443',
+        auth: 'free',
+        secure: true
     }
 ];
 

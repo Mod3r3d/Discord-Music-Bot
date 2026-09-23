@@ -73,16 +73,20 @@ const client = new Client({
     ]
 });
 
+const hasSpotifyCredentials = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
+
 client.manager = new Kazagumo({
     defaultSearchEngine: "youtube",
     plugins: [
         new KazagumoSpotify({
             clientId: process.env.SPOTIFY_CLIENT_ID || '',
             clientSecret: process.env.SPOTIFY_CLIENT_SECRET || '',
-            playlistPageLimit: 10,
-            albumPageLimit: 2,
+            playlistPageLimit: 50, // Hỗ trợ tới 5.000 bài thay vì bị chặn ở 100 bài
+            albumPageLimit: 10,
             searchLimit: 10,
             searchMarket: 'VN',
+            // Nếu có API Key, ưu tiên fetch trực tiếp qua Spotify API để không bị LavaSrc giới hạn 100 bài
+            lavalinkPluginTries: hasSpotifyCredentials ? 0 : 2
         })
     ],
     send: (guildId, payload) => {
@@ -123,6 +127,17 @@ client.manager.on('playerEmpty', (player) => {
 // Player bị hủy → dọn state
 client.manager.on('playerDestroy', (player) => {
     playerService.onPlayerDestroy(player.guildId);
+});
+
+// Bắt lỗi playback & resolve để debug trên Render
+client.manager.on('playerResolveError', (player, track, message) => {
+    console.error(`❌ [Kazagumo] Lỗi resolve bài hát "${track?.title}":`, message);
+});
+client.manager.on('playerException', (player, data) => {
+    console.error('❌ [Kazagumo] Player exception:', data);
+});
+client.manager.on('playerClosed', (player, data) => {
+    console.warn('⚠️ [Kazagumo] Player voice connection closed:', data);
 });
 
 // ============================================================
