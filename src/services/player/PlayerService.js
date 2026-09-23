@@ -31,7 +31,7 @@ class PlayerService {
                 guildId,
                 textId,
                 voiceId,
-                volume: 100,
+                volume: 130, // Mặc định 130% để to và rõ hơn
                 deaf: true
             });
         }
@@ -57,7 +57,7 @@ class PlayerService {
         };
 
         try {
-            result = await withTimeout(this.manager.search(query, { requester }), 20000, 'Kazagumo search');
+            result = await withTimeout(this.manager.search(query, { requester }), 35000, 'Kazagumo search');
         } catch (err) {
             console.error(`⚠️ [Search] Kazagumo search error:`, err.message);
         }

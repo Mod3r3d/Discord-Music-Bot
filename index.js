@@ -34,6 +34,7 @@ const repeatCmd = require('./src/commands/repeat');
 const shuffleCmd = require('./src/commands/shuffle');
 const historyCmd = require('./src/commands/history');
 const previousCmd = require('./src/commands/previous');
+const volumeCmd = require('./src/commands/volume');
 
 // ============================================================
 // 1. HTTP Health Server (độc lập, khởi động ngay lập tức)
@@ -87,7 +88,7 @@ client.manager = new Kazagumo({
             albumPageLimit: 10,
             searchLimit: 10,
             searchMarket: 'VN',
-            lavalinkPluginTries: 2 // Luôn ưu tiên Lavalink phân giải trước để không bị lỗi với playlist riêng tư/token
+            lavalinkPluginTries: hasSpotifyCredentials ? 0 : 2 // Tự động load đầy đủ hàng ngàn bài khi có Spotify API Key
         })
     ],
     send: (guildId, payload) => {
@@ -156,7 +157,8 @@ const slashCommands = [
     repeatCmd.definition,
     shuffleCmd.definition,
     historyCmd.definition,
-    previousCmd.definition
+    previousCmd.definition,
+    volumeCmd.definition
 ];
 
 client.once(Events.ClientReady, async () => {
@@ -206,6 +208,8 @@ client.on('interactionCreate', async (interaction) => {
                     return await historyCmd.execute(interaction, playerService);
                 case 'previous':
                     return await previousCmd.execute(interaction, playerService);
+                case 'volume':
+                    return await volumeCmd.execute(interaction, playerService);
             }
         }
 
@@ -268,6 +272,24 @@ client.on('interactionCreate', async (interaction) => {
                         } else {
                             await interaction.followUp({ content: '❌ Cần ít nhất 2 bài để xáo trộn.', ephemeral: true });
                         }
+                        break;
+                    }
+                    case 'np_vol_down': {
+                        const newVol = Math.max(10, (player.volume || 100) - 10);
+                        await player.setVolume(newVol);
+                        const state = getState(interaction.guild.id);
+                        const NowPlayingUI = require('./src/services/ui/NowPlayingUI');
+                        const updated = NowPlayingUI.create(player, player.queue.current, state);
+                        await interaction.editReply({ embeds: [updated.embed], components: updated.components });
+                        break;
+                    }
+                    case 'np_vol_up': {
+                        const newVol = Math.min(200, (player.volume || 100) + 10);
+                        await player.setVolume(newVol);
+                        const state = getState(interaction.guild.id);
+                        const NowPlayingUI = require('./src/services/ui/NowPlayingUI');
+                        const updated = NowPlayingUI.create(player, player.queue.current, state);
+                        await interaction.editReply({ embeds: [updated.embed], components: updated.components });
                         break;
                     }
                     case 'np_queue': {

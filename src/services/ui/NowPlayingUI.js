@@ -143,6 +143,16 @@ class NowPlayingUI {
 
         const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
+                .setCustomId('np_vol_down')
+                .setEmoji('🔉')
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
+                .setCustomId('np_vol_up')
+                .setEmoji('🔊')
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
                 .setCustomId('np_queue')
                 .setLabel('📜 Hàng đợi')
                 .setStyle(ButtonStyle.Secondary),
